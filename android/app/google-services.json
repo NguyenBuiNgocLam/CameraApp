@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "223889220522",
+    "project_id": "cameraapp-24d1e",
+    "storage_bucket": "cameraapp-24d1e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:223889220522:android:0d2ccd637caf8ed9dbc1d3",
+        "android_client_info": {
+          "package_name": "com.nhanlam.ai_vocabulary_camera"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "223889220522-0cnd5fg2n143d0ri3juk7g6jb5002iap.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.nhanlam.ai_vocabulary_camera",
+            "certificate_hash": "8802744ab46b9fe43a6c8eb15de8ea1ffa379488"
+          }
+        },
+        {
+          "client_id": "223889220522-ff9j4vbu0vvok4nfi2mb389cup1bgj39.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBTfJ24YMBEqHvkZWxwQ0W84T0ZZC8Va0M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "223889220522-ff9j4vbu0vvok4nfi2mb389cup1bgj39.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
