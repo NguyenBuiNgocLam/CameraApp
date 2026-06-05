@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/dictation_segment.dart';
@@ -20,12 +21,7 @@ class DictationTranscriptResult {
 class DictationService {
   DictationService({http.Client? client, String? baseUrl})
     : _client = client ?? http.Client(),
-      baseUrl =
-          baseUrl ??
-          const String.fromEnvironment(
-            'DICTATION_API_BASE_URL',
-            defaultValue: 'http://10.0.0.2:4000',
-          );
+      baseUrl = baseUrl ?? _resolveBaseUrl();
 
   final http.Client _client;
   final String baseUrl;
@@ -96,5 +92,15 @@ class DictationService {
     final decoded = jsonDecode(body);
     if (decoded is Map<String, dynamic>) return decoded;
     throw const FormatException('Expected JSON object.');
+  }
+
+  static String _resolveBaseUrl() {
+    const dartDefineUrl = String.fromEnvironment('DICTATION_API_BASE_URL');
+    if (dartDefineUrl.trim().isNotEmpty) return dartDefineUrl.trim();
+
+    final envUrl = dotenv.env['DICTATION_API_BASE_URL'] ?? '';
+    if (envUrl.trim().isNotEmpty) return envUrl.trim();
+
+    return 'http://10.0.2.2:4000';
   }
 }
