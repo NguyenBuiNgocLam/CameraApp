@@ -22,23 +22,64 @@ app.get('/health', (_, res) => {
 });
 
 app.post('/api/transcript', authMiddleware, async (req, res) => {
+  const requestId = createRequestId();
+  let videoId = null;
+
   try {
-    console.log(`Transcript request from user ${req.user.uid}`);
     const youtubeUrl = String(req.body?.youtubeUrl ?? '').trim();
-    const videoId = extractYouTubeVideoId(youtubeUrl);
+    videoId = extractYouTubeVideoId(youtubeUrl);
+
+    console.log(
+      `[${requestId}] Transcript request`,
+      JSON.stringify({
+        uid: req.user.uid,
+        videoId,
+        urlType: describeYouTubeInput(youtubeUrl),
+      }),
+    );
 
     if (!videoId) {
+      console.warn(
+        `[${requestId}] Invalid YouTube input`,
+        JSON.stringify({ inputLength: youtubeUrl.length }),
+      );
       return res.status(400).json({
         error: 'Invalid YouTube URL. Please paste a valid YouTube video link.',
       });
     }
 
-    const [videoTitle, transcript] = await Promise.all([
-      fetchVideoTitle(youtubeUrl).catch(() => 'YouTube video'),
-      fetchTranscript(videoId),
-    ]);
+    const videoTitle = await fetchVideoTitle(youtubeUrl).catch((error) => {
+      console.warn(
+        `[${requestId}] Could not fetch video title`,
+        JSON.stringify(formatErrorForLog(error)),
+      );
+      return 'YouTube video';
+    });
+
+    console.log(
+      `[${requestId}] Fetching transcript`,
+      JSON.stringify({ videoId }),
+    );
+
+    const transcript = await fetchTranscript(videoId);
+
+    console.log(
+      `[${requestId}] Transcript fetched`,
+      JSON.stringify({
+        videoId,
+        cueCount: Array.isArray(transcript) ? transcript.length : null,
+        resultType: Array.isArray(transcript) ? 'array' : typeof transcript,
+      }),
+    );
 
     if (!Array.isArray(transcript) || transcript.length === 0) {
+      console.warn(
+        `[${requestId}] Transcript unavailable or empty`,
+        JSON.stringify({
+          videoId,
+          resultType: Array.isArray(transcript) ? 'array' : typeof transcript,
+        }),
+      );
       return res.status(404).json({
         error:
           'This video does not have an available transcript/caption. Please try another video.',
@@ -51,15 +92,30 @@ app.post('/api/transcript', authMiddleware, async (req, res) => {
       .sort((a, b) => a.startTime - b.startTime);
 
     if (cues.length === 0) {
+      console.warn(
+        `[${requestId}] Transcript normalized to zero cues`,
+        JSON.stringify({ videoId, rawCueCount: transcript.length }),
+      );
       return res.status(404).json({
         error:
           'This video transcript is empty. Please try a video with captions.',
       });
     }
 
+    const segments = buildDictationSegments(cues);
+    console.log(
+      `[${requestId}] Transcript response ready`,
+      JSON.stringify({
+        videoId,
+        cueCount: cues.length,
+        segmentCount: segments.length,
+        title: videoTitle,
+      }),
+    );
+
     res.json({
       videoTitle,
-      segments: buildDictationSegments(cues),
+      segments,
     });
   } catch (error) {
     const message = String(error?.message ?? error);
@@ -69,6 +125,15 @@ app.post('/api/transcript', authMiddleware, async (req, res) => {
       lower.includes('caption') ||
       lower.includes('disabled') ||
       lower.includes('not available');
+
+    console.error(
+      `[${requestId}] Transcript request failed`,
+      JSON.stringify({
+        videoId,
+        statusCode: noTranscript ? 404 : 500,
+        error: formatErrorForLog(error),
+      }),
+    );
 
     res.status(noTranscript ? 404 : 500).json({
       error: noTranscript
@@ -130,6 +195,36 @@ function extractYouTubeVideoId(input) {
 function normalizeVideoId(value) {
   const id = String(value ?? '').trim();
   return /^[a-zA-Z0-9_-]{11}$/.test(id) ? id : null;
+}
+
+function createRequestId() {
+  return Math.random().toString(36).slice(2, 8);
+}
+
+function describeYouTubeInput(input) {
+  try {
+    const url = new URL(input);
+    return url.hostname.replace(/^www\./, '').replace(/^m\./, '');
+  } catch (_) {
+    return normalizeVideoId(input) ? 'video_id' : 'invalid_or_partial';
+  }
+}
+
+function formatErrorForLog(error) {
+  const cause = error?.cause;
+
+  return {
+    name: error?.name ?? null,
+    message: String(error?.message ?? error),
+    code: error?.code ?? cause?.code ?? null,
+    status: error?.status ?? error?.statusCode ?? cause?.status ?? null,
+    stack: trimStack(error?.stack),
+  };
+}
+
+function trimStack(stack) {
+  if (!stack) return null;
+  return String(stack).split('\n').slice(0, 5).join(' | ');
 }
 
 async function fetchVideoTitle(youtubeUrl) {
