@@ -54,7 +54,7 @@ class _ImportCsvDialogState extends State<ImportCsvDialog> {
       if (!mounted) return;
       if (items == null) {
         setState(() {
-          _message = 'Bạn chưa chọn file CSV.';
+          _message = 'You did not select a CSV file.';
           _isError = false;
           _isPicking = false;
         });
@@ -63,7 +63,8 @@ class _ImportCsvDialogState extends State<ImportCsvDialog> {
 
       setState(() {
         _items = items;
-        _message = 'Đã đọc ${items.length} từ. Kiểm tra preview rồi import.';
+        _message =
+            'Loaded ${items.length} words. Review the preview before importing.';
         _isError = false;
         _isPicking = false;
       });
@@ -82,7 +83,7 @@ class _ImportCsvDialogState extends State<ImportCsvDialog> {
     final selectedListId = _selectedListId;
     if (selectedListId == null || selectedListId.trim().isEmpty) {
       setState(() {
-        _message = 'Vui lòng chọn danh sách từ.';
+        _message = 'Please select a word list.';
         _isError = true;
       });
       return;
@@ -133,14 +134,14 @@ class _ImportCsvDialogState extends State<ImportCsvDialog> {
                 children: [
                   Expanded(
                     child: Text(
-                      'Nhập từ CSV',
+                      'Import from CSV',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w900,
                       ),
                     ),
                   ),
                   IconButton(
-                    tooltip: 'Đóng',
+                    tooltip: 'Close',
                     onPressed: () => Navigator.pop(context, false),
                     icon: const Icon(Icons.close_rounded),
                   ),
@@ -148,7 +149,7 @@ class _ImportCsvDialogState extends State<ImportCsvDialog> {
               ),
               const SizedBox(height: 10),
               Text(
-                'Định dạng: word, meaningVi, phonetic, partOfSpeech, exampleEn, exampleVi',
+                'Format: word, meaningVi, phonetic, partOfSpeech, exampleEn, exampleVi',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: colors.onSurfaceVariant,
                 ),
@@ -156,7 +157,7 @@ class _ImportCsvDialogState extends State<ImportCsvDialog> {
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 value: _safeSelectedListId(wordLists),
-                decoration: const InputDecoration(labelText: 'Danh sách từ *'),
+                decoration: const InputDecoration(labelText: 'Word list *'),
                 items:
                     wordLists
                         .map(
@@ -170,7 +171,7 @@ class _ImportCsvDialogState extends State<ImportCsvDialog> {
               ),
               const SizedBox(height: 12),
               CustomButton(
-                label: 'Chọn file CSV',
+                label: 'Choose CSV file',
                 icon: Icons.upload_file_rounded,
                 style: CustomButtonStyle.secondary,
                 isLoading: _isPicking,
@@ -251,7 +252,7 @@ class _ImportCsvDialogState extends State<ImportCsvDialog> {
                 children: [
                   Expanded(
                     child: CustomButton(
-                      label: 'Hủy',
+                      label: 'Cancel',
                       style: CustomButtonStyle.outline,
                       onPressed: () => Navigator.pop(context, false),
                     ),

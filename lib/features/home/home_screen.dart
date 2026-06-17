@@ -8,8 +8,8 @@ import '../../core/widgets/custom_button.dart';
 import '../../core/widgets/main_scaffold.dart';
 import '../../core/widgets/stat_card.dart';
 import '../../core/widgets/vocabulary_card.dart';
+import '../dashboard/providers/dashboard_provider.dart';
 import '../../providers/auth_provider.dart';
-import '../../providers/quiz_provider.dart';
 import '../../providers/vocabulary_provider.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -26,16 +26,28 @@ class _HomeScreenState extends State<HomeScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (_loaded) return;
-    _loaded = true;
     final userId = context.read<AuthProvider>().user?.uid;
     final vocabulary = context.read<VocabularyProvider>();
     if (userId != null) {
+      _loaded = true;
       Future.microtask(() async {
         await vocabulary.load();
         if (!mounted) return;
-        await context.read<QuizProvider>().loadResults(userId);
+        await context.read<DashboardProvider>().loadDashboard();
       });
     }
+  }
+
+  Future<void> _openTodayReview(String userId) async {
+    if (context.read<DashboardProvider>().stats.todayReviewCount == 0) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('No words to review today')));
+      return;
+    }
+    await Navigator.pushNamed(context, AppRoutes.todayReview, arguments: true);
+    if (!mounted || userId.trim().isEmpty) return;
+    await context.read<DashboardProvider>().refreshDashboard();
   }
 
   @override
@@ -43,7 +55,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final colors = Theme.of(context).colorScheme;
     final auth = context.watch<AuthProvider>();
     final vocabulary = context.watch<VocabularyProvider>();
-    final quiz = context.watch<QuizProvider>();
+    final dashboard = context.watch<DashboardProvider>();
+    final stats = dashboard.stats;
     final recentWords = vocabulary.items.take(3).toList();
     final name = auth.user?.name.split(' ').first ?? 'Nhan';
     final userId = auth.user?.uid ?? '';
@@ -93,24 +106,132 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 StatCard(
                   title: 'Words learned',
-                  value: '${vocabulary.totalWords}',
+                  value: '${stats.totalWords}',
                   icon: Icons.menu_book_rounded,
                 ),
                 StatCard(
-                  title: 'Quiz completed',
-                  value: '${quiz.quizCompleted(userId)}',
-                  icon: Icons.quiz_rounded,
+                  title: 'Mastered words',
+                  value: '${stats.masteredWords}',
+                  icon: Icons.verified_rounded,
                   color: AppColors.secondary,
                 ),
                 StatCard(
-                  title: 'Favorite words',
-                  value: '${vocabulary.favoriteWords}',
-                  icon: Icons.favorite_rounded,
+                  title: 'Current streak',
+                  value: '${stats.currentStreak}',
+                  icon: Icons.local_fire_department_rounded,
                   color: AppColors.warning,
                 ),
               ],
             ),
             const SizedBox(height: 22),
+            AppCard(
+              padding: const EdgeInsets.all(22),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 58,
+                    height: 58,
+                    decoration: BoxDecoration(
+                      color: colors.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Icon(
+                      Icons.event_available_rounded,
+                      color: colors.primary,
+                      size: 32,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  Text(
+                    'Today Review',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    dashboard.errorMessage != null
+                        ? 'Cannot load review queue'
+                        : dashboard.isLoading
+                        ? 'Checking review queue...'
+                        : stats.todayReviewCount == 0
+                        ? 'No words to review today'
+                        : 'You have ${stats.todayReviewCount} words to review today',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color:
+                          dashboard.errorMessage != null
+                              ? colors.error
+                              : colors.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  CustomButton(
+                    label: 'Start Review',
+                    icon: Icons.school_rounded,
+                    onPressed:
+                        userId.isEmpty ? null : () => _openTodayReview(userId),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            AppCard(
+              padding: const EdgeInsets.all(22),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Vocabulary Progress',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  _ProgressRow(
+                    label: 'Mastered',
+                    value: stats.masteredWords,
+                    total: stats.totalWords,
+                    color: AppColors.success,
+                  ),
+                  const SizedBox(height: 12),
+                  _ProgressRow(
+                    label: 'Temporary',
+                    value: stats.temporaryWords,
+                    total: stats.totalWords,
+                    color: AppColors.warning,
+                  ),
+                  const SizedBox(height: 12),
+                  _ProgressRow(
+                    label: 'Unknown',
+                    value: stats.unknownWords,
+                    total: stats.totalWords,
+                    color: colors.primary,
+                  ),
+                  const SizedBox(height: 18),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _MiniMetric(
+                          title: 'Words today',
+                          value: '${stats.wordsLearnedToday}',
+                          icon: Icons.add_circle_rounded,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _MiniMetric(
+                          title: 'Reviewed',
+                          value: '${stats.reviewedWordsToday}',
+                          icon: Icons.replay_circle_filled_rounded,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
             AppCard(
               padding: const EdgeInsets.all(22),
               child: Column(
@@ -155,53 +276,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 16),
-            AppCard(
-              padding: const EdgeInsets.all(22),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 58,
-                    height: 58,
-                    decoration: BoxDecoration(
-                      color: colors.error.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Icon(
-                      Icons.play_circle_fill_rounded,
-                      color: colors.error,
-                      size: 32,
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  Text(
-                    'YouTube Dictation',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Practice listening from YouTube videos',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: colors.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  CustomButton(
-                    label: 'Start Practice',
-                    icon: Icons.subtitles_rounded,
-                    style: CustomButtonStyle.secondary,
-                    onPressed:
-                        () => Navigator.pushNamed(
-                          context,
-                          AppRoutes.dictationHome,
-                        ),
-                  ),
-                ],
-              ),
-            ),
             const SizedBox(height: 26),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -239,6 +313,103 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ProgressRow extends StatelessWidget {
+  const _ProgressRow({
+    required this.label,
+    required this.value,
+    required this.total,
+    required this.color,
+  });
+
+  final String label;
+  final int value;
+  final int total;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final percent = total == 0 ? 0.0 : value / total;
+    final colors = Theme.of(context).colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+            Text(
+              '$value/$total',
+              style: TextStyle(color: colors.onSurfaceVariant),
+            ),
+          ],
+        ),
+        const SizedBox(height: 7),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(99),
+          child: SizedBox(
+            height: 9,
+            child: LinearProgressIndicator(
+              value: percent.clamp(0, 1),
+              color: color,
+              backgroundColor: color.withValues(alpha: 0.14),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MiniMetric extends StatelessWidget {
+  const _MiniMetric({
+    required this.title,
+    required this.value,
+    required this.icon,
+  });
+
+  final String title;
+  final String value;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Container(
+      constraints: const BoxConstraints(minHeight: 86),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colors.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: colors.primary),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+          ),
+          Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: colors.onSurfaceVariant),
+          ),
+        ],
       ),
     );
   }

@@ -18,7 +18,7 @@ class MainScaffold extends StatelessWidget {
     AppRoutes.home,
     AppRoutes.scan,
     AppRoutes.vocabulary,
-    AppRoutes.quiz,
+    AppRoutes.dictationHome,
     AppRoutes.profile,
   ];
 
@@ -47,8 +47,8 @@ class MainScaffold extends StatelessWidget {
             label: 'Vocabulary',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.quiz_rounded),
-            label: 'Quiz',
+            icon: Icon(Icons.subtitles_rounded),
+            label: 'Dictation',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person_rounded),

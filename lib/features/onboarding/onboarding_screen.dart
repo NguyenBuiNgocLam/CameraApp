@@ -28,10 +28,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       icon: Icons.auto_awesome_rounded,
     ),
     _OnboardingItem(
-      title: 'Practice and remember with quizzes',
+      title: 'Practice with smart review and dictation',
       subtitle:
-          'Review saved words with quick quizzes designed for steady progress.',
-      icon: Icons.psychology_alt_rounded,
+          'Review saved words and sharpen listening with YouTube dictation.',
+      icon: Icons.subtitles_rounded,
     ),
   ];
 

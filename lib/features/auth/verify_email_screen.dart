@@ -5,13 +5,25 @@ import '../../app/routes.dart';
 import '../../core/widgets/custom_button.dart';
 import '../../providers/auth_provider.dart';
 
-class VerifyEmailScreen extends StatelessWidget {
+class VerifyEmailScreen extends StatefulWidget {
   const VerifyEmailScreen({super.key});
 
+  @override
+  State<VerifyEmailScreen> createState() => _VerifyEmailScreenState();
+}
+
+class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
+  bool _isChecking = false;
+  bool _isResending = false;
+  bool _isLoggingOut = false;
+
   Future<void> _checkVerification(BuildContext context) async {
+    if (_isChecking || _isResending || _isLoggingOut) return;
+    setState(() => _isChecking = true);
     final auth = context.read<AuthProvider>();
     final verified = await auth.checkEmailVerification();
     if (!context.mounted) return;
+    setState(() => _isChecking = false);
 
     if (verified) {
       Navigator.pushNamedAndRemoveUntil(context, AppRoutes.home, (_) => false);
@@ -26,9 +38,12 @@ class VerifyEmailScreen extends StatelessWidget {
   }
 
   Future<void> _resendEmail(BuildContext context) async {
+    if (_isChecking || _isResending || _isLoggingOut) return;
+    setState(() => _isResending = true);
     final auth = context.read<AuthProvider>();
     final sent = await auth.resendVerificationEmail();
     if (!context.mounted) return;
+    setState(() => _isResending = false);
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -42,6 +57,8 @@ class VerifyEmailScreen extends StatelessWidget {
   }
 
   Future<void> _logout(BuildContext context) async {
+    if (_isChecking || _isResending || _isLoggingOut) return;
+    setState(() => _isLoggingOut = true);
     await context.read<AuthProvider>().logout();
     if (!context.mounted) return;
     Navigator.pushNamedAndRemoveUntil(context, AppRoutes.login, (_) => false);
@@ -52,6 +69,7 @@ class VerifyEmailScreen extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
     final auth = context.watch<AuthProvider>();
     final email = auth.user?.email ?? '';
+    final isBusy = _isChecking || _isResending || _isLoggingOut;
 
     return Scaffold(
       body: SafeArea(
@@ -107,25 +125,24 @@ class VerifyEmailScreen extends StatelessWidget {
                 CustomButton(
                   label: 'I have verified',
                   icon: Icons.verified_rounded,
-                  isLoading: auth.isLoading,
-                  onPressed:
-                      auth.isLoading ? null : () => _checkVerification(context),
+                  isLoading: _isChecking,
+                  onPressed: isBusy ? null : () => _checkVerification(context),
                 ),
                 const SizedBox(height: 12),
                 CustomButton(
                   label: 'Resend email',
                   icon: Icons.send_rounded,
                   style: CustomButtonStyle.secondary,
-                  isLoading: auth.isLoading,
-                  onPressed:
-                      auth.isLoading ? null : () => _resendEmail(context),
+                  isLoading: _isResending,
+                  onPressed: isBusy ? null : () => _resendEmail(context),
                 ),
                 const SizedBox(height: 12),
                 CustomButton(
                   label: 'Logout / Change account',
                   icon: Icons.logout_rounded,
                   style: CustomButtonStyle.outline,
-                  onPressed: auth.isLoading ? null : () => _logout(context),
+                  isLoading: _isLoggingOut,
+                  onPressed: isBusy ? null : () => _logout(context),
                 ),
               ],
             ),

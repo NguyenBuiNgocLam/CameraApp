@@ -8,6 +8,8 @@ import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/error_state_widget.dart';
 import '../../../core/widgets/loading_widget.dart';
 import '../../../core/widgets/main_scaffold.dart';
+import '../../system_vocabulary/models/system_vocabulary_set.dart';
+import '../../system_vocabulary/providers/system_vocabulary_provider.dart';
 import '../models/word_list.dart';
 import '../providers/word_list_provider.dart';
 
@@ -29,6 +31,7 @@ class _WordListScreenState extends State<WordListScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       context.read<WordListProvider>().loadWordLists();
+      context.read<SystemVocabularyProvider>().loadSets();
     });
   }
 
@@ -47,8 +50,8 @@ class _WordListScreenState extends State<WordListScreen> {
       SnackBar(
         content: Text(
           success
-              ? 'Đã tạo danh sách từ'
-              : provider.errorMessage ?? 'Không thể tạo danh sách từ',
+              ? 'Word list created'
+              : provider.errorMessage ?? 'Could not create word list',
         ),
       ),
     );
@@ -57,6 +60,9 @@ class _WordListScreenState extends State<WordListScreen> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<WordListProvider>();
+    final systemProvider = context.watch<SystemVocabularyProvider>();
+    final systemSets = systemProvider.sets;
+    final totalItems = systemSets.length + provider.wordLists.length;
 
     return MainScaffold(
       currentIndex: 2,
@@ -66,33 +72,51 @@ class _WordListScreenState extends State<WordListScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
             child: CustomButton(
-              label: 'Tạo danh sách từ',
+              label: 'Create word list',
               icon: Icons.add_rounded,
               onPressed: _createList,
             ),
           ),
           Expanded(
             child:
-                provider.isLoading
-                    ? const LoadingWidget(message: 'Đang tải danh sách...')
+                provider.isLoading && totalItems == 0
+                    ? const LoadingWidget(message: 'Loading word lists...')
                     : provider.errorMessage != null
                     ? ErrorStateWidget(
-                      title: 'Không tải được danh sách',
+                      title: 'Could not load word lists',
                       message: provider.errorMessage!,
                       onRetry: provider.loadWordLists,
                     )
-                    : provider.wordLists.isEmpty
+                    : totalItems == 0
                     ? const EmptyStateWidget(
-                      title: 'Chưa có danh sách từ',
-                      message: 'Tạo danh sách TOEIC, B1, IELTS... để bắt đầu.',
+                      title: 'No word lists yet',
+                      message:
+                          'Create your own list or import system vocabulary to get started.',
                       icon: Icons.folder_copy_rounded,
                     )
                     : ListView.separated(
                       padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
-                      itemCount: provider.wordLists.length,
+                      itemCount: totalItems,
                       separatorBuilder: (_, __) => const SizedBox(height: 12),
                       itemBuilder: (context, index) {
-                        final list = provider.wordLists[index];
+                        if (index < systemSets.length) {
+                          final set = systemSets[index];
+                          return _SystemWordListCard(
+                            set: set,
+                            onTap: () async {
+                              await systemProvider.selectSet(set);
+                              if (!context.mounted) return;
+                              Navigator.pushNamed(
+                                context,
+                                AppRoutes.systemVocabularyDetail,
+                                arguments: set,
+                              );
+                            },
+                          );
+                        }
+
+                        final userListIndex = index - systemSets.length;
+                        final list = provider.wordLists[userListIndex];
                         return _WordListCard(
                           list: list,
                           onTap: () {
@@ -107,6 +131,88 @@ class _WordListScreenState extends State<WordListScreen> {
                       },
                     ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SystemWordListCard extends StatelessWidget {
+  const _SystemWordListCard({required this.set, required this.onTap});
+
+  final SystemVocabularySet set;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return AppCard(
+      onTap: onTap,
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 26,
+            backgroundColor: colors.primary.withValues(alpha: 0.12),
+            child: Icon(Icons.public_rounded, color: colors.primary),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        set.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w900),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: colors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        'System',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: colors.primary,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  set.description.trim().isEmpty
+                      ? 'Built-in vocabulary for everyone'
+                      : set.description,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: colors.onSurfaceVariant),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${set.totalWords} words',
+                  style: TextStyle(
+                    color: colors.primary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Icon(Icons.chevron_right_rounded),
         ],
       ),
     );
@@ -146,7 +252,7 @@ class _WordListCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   list.description.trim().isEmpty
-                      ? 'Không có ghi chú'
+                      ? 'No notes'
                       : list.description,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -154,7 +260,7 @@ class _WordListCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${list.wordCount} từ',
+                  '${list.wordCount} words',
                   style: TextStyle(
                     color: colors.primary,
                     fontWeight: FontWeight.w800,
@@ -191,18 +297,18 @@ class _CreateListDialogState extends State<_CreateListDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Tạo danh sách từ'),
+      title: const Text('Create word list'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           TextField(
             controller: _nameController,
-            decoration: const InputDecoration(labelText: 'Tên danh sách'),
+            decoration: const InputDecoration(labelText: 'List name'),
           ),
           const SizedBox(height: 10),
           TextField(
             controller: _descriptionController,
-            decoration: const InputDecoration(labelText: 'Ghi chú'),
+            decoration: const InputDecoration(labelText: 'Notes'),
             minLines: 1,
             maxLines: 3,
           ),
@@ -211,7 +317,7 @@ class _CreateListDialogState extends State<_CreateListDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Hủy'),
+          child: const Text('Cancel'),
         ),
         FilledButton(
           onPressed: () {
@@ -225,7 +331,7 @@ class _CreateListDialogState extends State<_CreateListDialog> {
               ),
             );
           },
-          child: const Text('Tạo'),
+          child: const Text('Create'),
         ),
       ],
     );

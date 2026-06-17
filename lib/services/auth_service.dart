@@ -169,6 +169,28 @@ class AuthService {
     await reloadedUser.sendEmailVerification();
   }
 
+  Future<void> sendPasswordResetEmail(String email) async {
+    if (!FirebaseAppService.isReady) {
+      throw Exception(
+        'Firebase is not ready. Please configure Firebase first.',
+      );
+    }
+
+    final trimmedEmail = email.trim();
+    if (trimmedEmail.isEmpty) {
+      throw Exception('Vui lòng nhập email.');
+    }
+    if (!_isValidEmail(trimmedEmail)) {
+      throw Exception('Email không hợp lệ.');
+    }
+
+    try {
+      await _auth.sendPasswordResetEmail(email: trimmedEmail);
+    } on FirebaseAuthException catch (error) {
+      throw Exception(_friendlyPasswordResetError(error));
+    }
+  }
+
   Future<bool> checkEmailVerified() async {
     final user = _auth.currentUser;
     if (user == null) return false;
@@ -253,6 +275,23 @@ class AuthService {
       'network-request-failed' => 'Network error. Please try again.',
       _ => error.message ?? 'Authentication failed. Please try again.',
     };
+  }
+
+  String _friendlyPasswordResetError(FirebaseAuthException error) {
+    return switch (error.code) {
+      'invalid-email' => 'Email không hợp lệ.',
+      'user-not-found' => 'Không tìm thấy tài khoản với email này.',
+      'network-request-failed' => 'Không có kết nối mạng.',
+      'too-many-requests' =>
+        'Bạn thao tác quá nhiều lần. Vui lòng thử lại sau.',
+      _ =>
+        error.message ??
+            'Không thể gửi email đặt lại mật khẩu. Vui lòng thử lại.',
+    };
+  }
+
+  bool _isValidEmail(String email) {
+    return RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email);
   }
 
   Future<void> _initializeGoogleSignIn() async {

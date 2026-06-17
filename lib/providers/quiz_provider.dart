@@ -1,13 +1,16 @@
 import 'package:flutter/foundation.dart';
 
+import '../features/activity/services/learning_activity_service.dart';
 import '../models/quiz_models.dart';
 import '../models/vocabulary_item.dart';
 import '../services/quiz_service.dart';
 
 class QuizProvider extends ChangeNotifier {
-  QuizProvider(this._quizService);
+  QuizProvider(this._quizService, {LearningActivityService? activityService})
+    : _activityService = activityService ?? LearningActivityService();
 
   final QuizService _quizService;
+  final LearningActivityService _activityService;
 
   List<QuizQuestion> questions = [];
   List<QuizResult> results = [];
@@ -61,6 +64,9 @@ class QuizProvider extends ChangeNotifier {
       score: score,
       totalQuestions: questions.length,
     );
+    try {
+      await _activityService.recordQuizCompleted(uid: userId);
+    } catch (_) {}
     await loadResults(userId);
   }
 

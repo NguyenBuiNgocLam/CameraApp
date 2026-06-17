@@ -17,7 +17,7 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    Timer(const Duration(seconds: 2), () {
+    Timer(const Duration(milliseconds: 600), () {
       if (!mounted) return;
       final auth = context.read<AuthProvider>();
       final route =
@@ -62,28 +62,6 @@ class _SplashScreenState extends State<SplashScreen> {
                   color: Colors.white,
                   size: 48,
                 ),
-              ),
-              const SizedBox(height: 28),
-              Text(
-                'AI Vocabulary Camera',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                'Learn English from everything around you',
-                textAlign: TextAlign.center,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyLarge?.copyWith(color: colors.onSurfaceVariant),
-              ),
-              const SizedBox(height: 34),
-              const SizedBox(
-                width: 34,
-                height: 34,
-                child: CircularProgressIndicator(strokeWidth: 3),
               ),
             ],
           ),

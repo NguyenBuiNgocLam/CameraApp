@@ -37,7 +37,7 @@ class _VocabularyLearningHomeScreenState
       final selectedList =
           wordLists.selectedList ?? wordLists.wordLists.firstOrNull;
       if (selectedList == null) return;
-      await learning.startLearning(listId: selectedList.id);
+      await learning.loadWordListStats(selectedList.id);
     });
   }
 
@@ -53,6 +53,18 @@ class _VocabularyLearningHomeScreenState
     Navigator.pushNamed(context, AppRoutes.vocabularyLearningPractice);
   }
 
+  Future<void> _startReview() async {
+    final provider = context.read<VocabularyLearningProvider>();
+    final wordLists = context.read<WordListProvider>();
+    final selectedList =
+        wordLists.selectedList ?? wordLists.wordLists.firstOrNull;
+    if (selectedList == null) return;
+    await provider.startTodayReview(listId: selectedList.id);
+    if (!mounted) return;
+    if (provider.questions.isEmpty) return;
+    Navigator.pushNamed(context, AppRoutes.vocabularyLearningPractice);
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<VocabularyLearningProvider>();
@@ -60,19 +72,19 @@ class _VocabularyLearningHomeScreenState
 
     return MainScaffold(
       currentIndex: 2,
-      appBar: AppBar(title: const Text('Học từ vựng')),
+      appBar: AppBar(title: const Text('Vocabulary Learning')),
       child:
           provider.isLoading
-              ? const LoadingWidget(message: 'Đang tải từ vựng...')
-              : provider.words.isEmpty
+              ? const LoadingWidget(message: 'Loading vocabulary...')
+              : wordList == null
               ? const EmptyStateWidget(
-                title: 'Bạn chưa có từ vựng nào',
-                message: 'Hãy thêm từ trước rồi quay lại học nhé.',
+                title: 'No vocabulary yet',
+                message: 'Add some words first, then come back to study.',
                 icon: Icons.school_rounded,
               )
               : provider.errorMessage != null && provider.questions.isEmpty
               ? ErrorStateWidget(
-                title: 'Chưa thể bắt đầu học',
+                title: 'Cannot start learning yet',
                 message: provider.errorMessage!,
                 onRetry: () => provider.startLearning(),
               )
@@ -82,36 +94,29 @@ class _VocabularyLearningHomeScreenState
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _HeroCard(
-                      totalWords: provider.words.length,
-                      listName: wordList?.name ?? 'Danh sách từ',
+                      totalWords: provider.listTotalCount,
+                      listName: wordList.name,
                     ),
                     const SizedBox(height: 14),
                     _StatsGrid(provider: provider),
                     const SizedBox(height: 16),
                     CustomButton(
-                      label: 'Bắt đầu học',
+                      label: 'Start learning',
                       icon: Icons.play_arrow_rounded,
                       onPressed:
                           () => _startPractice(VocabularyLearningMode.all),
                     ),
                     const SizedBox(height: 10),
                     CustomButton(
-                      label: 'Ôn lỗi sai',
-                      icon: Icons.refresh_rounded,
+                      label:
+                          provider.dueTodayCount > 0
+                              ? 'Review ${provider.dueTodayCount}'
+                              : 'Review',
+                      icon: Icons.today_rounded,
                       style: CustomButtonStyle.secondary,
+                      isLoading: provider.isReviewLoading,
                       onPressed:
-                          () =>
-                              _startPractice(VocabularyLearningMode.wrongOnly),
-                    ),
-                    const SizedBox(height: 10),
-                    CustomButton(
-                      label: 'Học từ chưa biết',
-                      icon: Icons.lightbulb_rounded,
-                      style: CustomButtonStyle.outline,
-                      onPressed:
-                          () => _startPractice(
-                            VocabularyLearningMode.unknownOnly,
-                          ),
+                          provider.dueTodayCount == 0 ? null : _startReview,
                     ),
                   ],
                 ),
@@ -144,14 +149,14 @@ class _HeroCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Học từ vựng',
+                  'Vocabulary Learning',
                   style: Theme.of(
                     context,
                   ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '$listName · tối đa 20 từ/session · $totalWords từ sẵn sàng',
+                  '$listName · 10 flashcards + practice · $totalWords words ready',
                   style: TextStyle(color: colors.onSurfaceVariant),
                 ),
               ],
@@ -170,14 +175,11 @@ class _StatsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final words = provider.words;
-    final unknown =
-        words.where((word) => word.learningLevel == 'unknown').length;
-    final temporary =
-        words.where((word) => word.learningLevel == 'temporary').length;
-    final mastered =
-        words.where((word) => word.learningLevel == 'mastered').length;
-    final wrong = words.where((word) => word.wrongCount > 0).length;
+    final unknown = provider.listUnknownCount;
+    final temporary = provider.listTemporaryCount;
+    final mastered = provider.listMasteredCount;
+    final wrong = provider.listWrongCount;
+    final due = provider.dueTodayCount;
 
     return GridView.count(
       shrinkWrap: true,
@@ -187,11 +189,15 @@ class _StatsGrid extends StatelessWidget {
       crossAxisSpacing: 12,
       childAspectRatio: 1.65,
       children: [
-        _StatCard(label: 'Tổng số từ', value: words.length.toString()),
-        _StatCard(label: 'Chưa biết', value: unknown.toString()),
-        _StatCard(label: 'Nhớ tạm', value: temporary.toString()),
-        _StatCard(label: 'Thông thạo', value: mastered.toString()),
-        _StatCard(label: 'Lỗi sai trước đây', value: wrong.toString()),
+        _StatCard(
+          label: 'Total words',
+          value: provider.listTotalCount.toString(),
+        ),
+        _StatCard(label: 'Unknown', value: unknown.toString()),
+        _StatCard(label: 'Learning', value: temporary.toString()),
+        _StatCard(label: 'Mastered', value: mastered.toString()),
+        _StatCard(label: 'Previously wrong', value: wrong.toString()),
+        _StatCard(label: 'Due today', value: due.toString()),
       ],
     );
   }

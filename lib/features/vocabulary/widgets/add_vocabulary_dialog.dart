@@ -221,16 +221,16 @@ class _AddVocabularyDialogState extends State<AddVocabularyDialog> {
         context: context,
         builder:
             (context) => AlertDialog(
-              title: const Text('Từ này đã tồn tại'),
-              content: const Text('Bạn có muốn lưu tiếp không?'),
+              title: const Text('This word already exists'),
+              content: const Text('Do you want to save it anyway?'),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context, false),
-                  child: const Text('Hủy'),
+                  child: const Text('Cancel'),
                 ),
                 FilledButton(
                   onPressed: () => Navigator.pop(context, true),
-                  child: const Text('Lưu tiếp'),
+                  child: const Text('Save anyway'),
                 ),
               ],
             ),
@@ -244,7 +244,7 @@ class _AddVocabularyDialogState extends State<AddVocabularyDialog> {
     final selectedListId = _selectedListId;
     if (selectedListId == null || selectedListId.trim().isEmpty) {
       setState(() {
-        _localError = 'Vui lòng chọn danh sách từ.';
+        _localError = 'Please select a word list.';
       });
       return;
     }
@@ -318,7 +318,7 @@ class _AddVocabularyDialogState extends State<AddVocabularyDialog> {
     final provider = context.watch<VocabularyProvider>();
     final wordListProvider = context.watch<WordListProvider>();
     final colors = Theme.of(context).colorScheme;
-    final wordLabel = _tabIndex == 0 ? 'Từ *' : 'Cụm từ / Câu *';
+    final wordLabel = _tabIndex == 0 ? 'Word *' : 'Phrase / Sentence *';
     final wordLists = wordListProvider.wordLists;
 
     return Dialog(
@@ -339,13 +339,13 @@ class _AddVocabularyDialogState extends State<AddVocabularyDialog> {
                     children: [
                       Expanded(
                         child: Text(
-                          'Thêm từ mới',
+                          'Add new word',
                           style: Theme.of(context).textTheme.titleLarge
                               ?.copyWith(fontWeight: FontWeight.w900),
                         ),
                       ),
                       IconButton(
-                        tooltip: 'Đóng',
+                        tooltip: 'Close',
                         onPressed: () => Navigator.pop(context, false),
                         icon: const Icon(Icons.close_rounded),
                       ),
@@ -354,14 +354,15 @@ class _AddVocabularyDialogState extends State<AddVocabularyDialog> {
                   const SizedBox(height: 12),
                   TabBar(
                     onTap: (index) => setState(() => _tabIndex = index),
-                    tabs: const [Tab(text: 'Từ'), Tab(text: 'Cụm từ / Câu')],
+                    tabs: const [
+                      Tab(text: 'Word'),
+                      Tab(text: 'Phrase / Sentence'),
+                    ],
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
                     value: _safeSelectedListId(wordLists),
-                    decoration: const InputDecoration(
-                      labelText: 'Danh sách từ *',
-                    ),
+                    decoration: const InputDecoration(labelText: 'Word list *'),
                     items:
                         wordLists
                             .map(
@@ -376,7 +377,7 @@ class _AddVocabularyDialogState extends State<AddVocabularyDialog> {
                     validator:
                         (value) =>
                             value == null || value.trim().isEmpty
-                                ? 'Vui lòng chọn danh sách từ.'
+                                ? 'Please select a word list.'
                                 : null,
                   ),
                   const SizedBox(height: 12),
@@ -397,7 +398,7 @@ class _AddVocabularyDialogState extends State<AddVocabularyDialog> {
                                 ),
                               )
                               : IconButton(
-                                tooltip: 'Tra từ bằng AI',
+                                tooltip: 'Look up with AI',
                                 onPressed: _lookupWithAI,
                                 icon: const Icon(Icons.auto_awesome_rounded),
                               ),
@@ -407,7 +408,7 @@ class _AddVocabularyDialogState extends State<AddVocabularyDialog> {
                     validator:
                         (value) =>
                             value == null || value.trim().isEmpty
-                                ? 'Vui lòng nhập từ hoặc cụm từ.'
+                                ? 'Please enter a word or phrase.'
                                 : null,
                   ),
                   if (_suggestions.isNotEmpty) ...[
@@ -439,7 +440,7 @@ class _AddVocabularyDialogState extends State<AddVocabularyDialog> {
                   ],
                   const SizedBox(height: 12),
                   CustomButton(
-                    label: 'Tra từ bằng AI',
+                    label: 'Look up with AI',
                     icon: Icons.auto_awesome_rounded,
                     style: CustomButtonStyle.secondary,
                     isLoading: _isLookingUp,
@@ -448,12 +449,14 @@ class _AddVocabularyDialogState extends State<AddVocabularyDialog> {
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: _meaningController,
-                    decoration: const InputDecoration(labelText: 'Bản dịch *'),
+                    decoration: const InputDecoration(
+                      labelText: 'Translation *',
+                    ),
                     textInputAction: TextInputAction.next,
                     validator:
                         (value) =>
                             value == null || value.trim().isEmpty
-                                ? 'Vui lòng nhập bản dịch.'
+                                ? 'Please enter a translation.'
                                 : null,
                   ),
                   const SizedBox(height: 12),
@@ -463,7 +466,7 @@ class _AddVocabularyDialogState extends State<AddVocabularyDialog> {
                         child: TextFormField(
                           controller: _phoneticController,
                           decoration: const InputDecoration(
-                            labelText: 'Phiên âm',
+                            labelText: 'Phonetic',
                           ),
                         ),
                       ),
@@ -472,7 +475,7 @@ class _AddVocabularyDialogState extends State<AddVocabularyDialog> {
                         child: TextFormField(
                           controller: _partOfSpeechController,
                           decoration: const InputDecoration(
-                            labelText: 'Từ loại',
+                            labelText: 'Part of speech',
                           ),
                         ),
                       ),
@@ -483,7 +486,7 @@ class _AddVocabularyDialogState extends State<AddVocabularyDialog> {
                     children: [
                       Expanded(
                         child: Text(
-                          'Định nghĩa',
+                          'Definitions',
                           style: Theme.of(context).textTheme.titleSmall
                               ?.copyWith(fontWeight: FontWeight.w800),
                         ),
@@ -491,7 +494,7 @@ class _AddVocabularyDialogState extends State<AddVocabularyDialog> {
                       TextButton.icon(
                         onPressed: _addDefinition,
                         icon: const Icon(Icons.add_rounded),
-                        label: const Text('Thêm nghĩa'),
+                        label: const Text('Add definition'),
                       ),
                     ],
                   ),
@@ -508,7 +511,7 @@ class _AddVocabularyDialogState extends State<AddVocabularyDialog> {
                             child: TextFormField(
                               controller: definition.partOfSpeech,
                               decoration: const InputDecoration(
-                                labelText: 'Từ loại',
+                                labelText: 'Part of speech',
                               ),
                             ),
                           ),
@@ -517,14 +520,14 @@ class _AddVocabularyDialogState extends State<AddVocabularyDialog> {
                             child: TextFormField(
                               controller: definition.meaningVi,
                               decoration: const InputDecoration(
-                                labelText: 'Nghĩa tiếng Việt',
+                                labelText: 'Vietnamese meaning',
                               ),
                               minLines: 1,
                               maxLines: 2,
                             ),
                           ),
                           IconButton(
-                            tooltip: 'Xóa nghĩa',
+                            tooltip: 'Remove definition',
                             onPressed: () => _removeDefinition(index),
                             icon: const Icon(Icons.remove_circle_outline),
                           ),
@@ -536,7 +539,7 @@ class _AddVocabularyDialogState extends State<AddVocabularyDialog> {
                   TextFormField(
                     controller: _exampleEnController,
                     decoration: const InputDecoration(
-                      labelText: 'Ví dụ tiếng Anh',
+                      labelText: 'English example',
                     ),
                     minLines: 1,
                     maxLines: 3,
@@ -545,7 +548,7 @@ class _AddVocabularyDialogState extends State<AddVocabularyDialog> {
                   TextFormField(
                     controller: _exampleViController,
                     decoration: const InputDecoration(
-                      labelText: 'Dịch ví dụ tiếng Việt',
+                      labelText: 'Vietnamese example translation',
                     ),
                     minLines: 1,
                     maxLines: 3,
@@ -554,7 +557,7 @@ class _AddVocabularyDialogState extends State<AddVocabularyDialog> {
                   TextFormField(
                     controller: _sourceContextController,
                     decoration: const InputDecoration(
-                      labelText: 'Ngữ cảnh nguồn',
+                      labelText: 'Source context',
                     ),
                     minLines: 1,
                     maxLines: 3,
@@ -562,15 +565,13 @@ class _AddVocabularyDialogState extends State<AddVocabularyDialog> {
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: _imageUrlController,
-                    decoration: const InputDecoration(
-                      labelText: 'URL hình ảnh',
-                    ),
+                    decoration: const InputDecoration(labelText: 'Image URL'),
                     keyboardType: TextInputType.url,
                     validator: (value) {
                       final url = value?.trim() ?? '';
                       if (url.isEmpty) return null;
                       if (!url.startsWith('https://')) {
-                        return 'URL hình ảnh phải bắt đầu bằng https://';
+                        return 'Image URL must start with https://';
                       }
                       return null;
                     },
@@ -597,7 +598,7 @@ class _AddVocabularyDialogState extends State<AddVocabularyDialog> {
                     children: [
                       Expanded(
                         child: CustomButton(
-                          label: 'Hủy',
+                          label: 'Cancel',
                           style: CustomButtonStyle.outline,
                           onPressed: () => Navigator.pop(context, false),
                         ),
@@ -605,7 +606,7 @@ class _AddVocabularyDialogState extends State<AddVocabularyDialog> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: CustomButton(
-                          label: 'Thêm từ',
+                          label: 'Add word',
                           icon: Icons.add_rounded,
                           isLoading: provider.isSaving,
                           onPressed: provider.isSaving ? null : _save,

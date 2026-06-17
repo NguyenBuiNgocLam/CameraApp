@@ -46,7 +46,7 @@ class _DictationHomeScreenState extends State<DictationHomeScreen> {
         dictation.videoTitle != null && dictation.segments.isNotEmpty;
 
     return MainScaffold(
-      currentIndex: 0,
+      currentIndex: 3,
       appBar: AppBar(title: const Text('YouTube Dictation')),
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),

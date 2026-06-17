@@ -13,6 +13,9 @@ class AuthProvider extends ChangeNotifier {
   String? errorMessage;
   bool isEmailVerificationSent = false;
   bool isEmailVerified = false;
+  bool isResetPasswordLoading = false;
+  String? resetPasswordMessage;
+  String? resetPasswordError;
 
   bool get isAuthenticated => user != null;
   bool get canEnterApp =>
@@ -106,6 +109,34 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  Future<bool> sendPasswordResetEmail(String email) async {
+    isResetPasswordLoading = true;
+    resetPasswordMessage = null;
+    resetPasswordError = null;
+    notifyListeners();
+
+    try {
+      await _authService.sendPasswordResetEmail(email);
+      resetPasswordMessage =
+          'Email đặt lại mật khẩu đã được gửi. Vui lòng kiểm tra Gmail.';
+      isResetPasswordLoading = false;
+      notifyListeners();
+      return true;
+    } catch (error) {
+      resetPasswordError = error.toString().replaceFirst('Exception: ', '');
+      isResetPasswordLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  void clearResetPasswordState() {
+    isResetPasswordLoading = false;
+    resetPasswordMessage = null;
+    resetPasswordError = null;
+    notifyListeners();
   }
 
   Future<void> logout() async {

@@ -42,18 +42,22 @@ class VocabularyLearningResultScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final provider = context.watch<VocabularyLearningProvider>();
     final total = provider.questions.length;
+    final isReview =
+        provider.sessionMode == VocabularyLearningSessionMode.review;
     final colors = Theme.of(context).colorScheme;
 
     return MainScaffold(
       currentIndex: 2,
-      appBar: AppBar(title: const Text('Kết quả học')),
+      appBar: AppBar(
+        title: Text(isReview ? 'Review Results' : 'Learning Results'),
+      ),
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 112),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             AppCard(
-              padding: const EdgeInsets.all(22),
+              padding: const EdgeInsets.all(20),
               child: Column(
                 children: [
                   CircleAvatar(
@@ -67,15 +71,17 @@ class VocabularyLearningResultScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Hoàn thành bài học',
+                    isReview ? 'Review completed' : 'Lesson completed',
                     textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.w900,
                     ),
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    '$total câu đã học',
+                    '$total questions studied',
                     style: TextStyle(
                       color: colors.onSurfaceVariant,
                       fontWeight: FontWeight.w700,
@@ -88,21 +94,34 @@ class VocabularyLearningResultScreen extends StatelessWidget {
             _ResultGrid(provider: provider),
             const SizedBox(height: 18),
             CustomButton(
-              label: 'Học tiếp',
+              label: 'Continue learning',
               icon: Icons.play_arrow_rounded,
               onPressed: () => _startAgain(context, VocabularyLearningMode.all),
             ),
             const SizedBox(height: 10),
             CustomButton(
-              label: 'Ôn lỗi sai',
+              label: 'Review due words',
               icon: Icons.refresh_rounded,
               style: CustomButtonStyle.secondary,
               onPressed:
-                  () => _startAgain(context, VocabularyLearningMode.wrongOnly),
+                  () => provider.startTodayReview().then((_) {
+                    if (!context.mounted) return;
+                    if (provider.questions.isEmpty) {
+                      Navigator.pushReplacementNamed(
+                        context,
+                        AppRoutes.vocabularyLearning,
+                      );
+                      return;
+                    }
+                    Navigator.pushReplacementNamed(
+                      context,
+                      AppRoutes.vocabularyLearningPractice,
+                    );
+                  }),
             ),
             const SizedBox(height: 10),
             CustomButton(
-              label: 'Quay về Vocabulary',
+              label: 'Back to Vocabulary',
               icon: Icons.menu_book_rounded,
               style: CustomButtonStyle.outline,
               onPressed: () => _backToVocabulary(context),
@@ -121,20 +140,37 @@ class _ResultGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      mainAxisSpacing: 12,
-      crossAxisSpacing: 12,
-      childAspectRatio: 1.45,
-      children: [
-        _ResultCard(label: 'Số câu đúng', value: '${provider.correctCount}'),
-        _ResultCard(label: 'Số câu sai', value: '${provider.wrongCount}'),
-        _ResultCard(label: 'Thông thạo', value: '${provider.masteredCount}'),
-        _ResultCard(label: 'Nhớ tạm', value: '${provider.temporaryCount}'),
-        _ResultCard(label: 'Chưa biết', value: '${provider.unknownCount}'),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isNarrow = constraints.maxWidth < 360;
+        final crossAxisCount = isNarrow ? 1 : 2;
+        const spacing = 12.0;
+        const desiredHeight = 112.0;
+        final itemWidth =
+            (constraints.maxWidth - spacing * (crossAxisCount - 1)) /
+            crossAxisCount;
+        return GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: crossAxisCount,
+          mainAxisSpacing: spacing,
+          crossAxisSpacing: spacing,
+          childAspectRatio: itemWidth / desiredHeight,
+          children: [
+            _ResultCard(
+              label: 'Correct answers',
+              value: '${provider.correctCount}',
+            ),
+            _ResultCard(
+              label: 'Wrong answers',
+              value: '${provider.wrongCount}',
+            ),
+            _ResultCard(label: 'Mastered', value: '${provider.masteredCount}'),
+            _ResultCard(label: 'Learning', value: '${provider.temporaryCount}'),
+            _ResultCard(label: 'Unknown', value: '${provider.unknownCount}'),
+          ],
+        );
+      },
     );
   }
 }
@@ -150,13 +186,15 @@ class _ResultCard extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
 
     return AppCard(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
             value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
               color: colors.primary,
               fontWeight: FontWeight.w900,
@@ -167,6 +205,7 @@ class _ResultCard extends StatelessWidget {
             label,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.start,
             style: TextStyle(
               color: colors.onSurfaceVariant,
               fontWeight: FontWeight.w800,

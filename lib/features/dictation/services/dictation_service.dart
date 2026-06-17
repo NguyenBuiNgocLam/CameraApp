@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
+import '../../../services/auth_token_service.dart';
 import '../models/dictation_segment.dart';
 import '../utils/youtube_utils.dart';
 
@@ -19,11 +20,16 @@ class DictationTranscriptResult {
 }
 
 class DictationService {
-  DictationService({http.Client? client, String? baseUrl})
-    : _client = client ?? http.Client(),
-      baseUrl = baseUrl ?? _resolveBaseUrl();
+  DictationService({
+    http.Client? client,
+    AuthTokenService? authTokenService,
+    String? baseUrl,
+  }) : _client = client ?? http.Client(),
+       _authTokenService = authTokenService ?? const AuthTokenService(),
+       baseUrl = baseUrl ?? _resolveBaseUrl();
 
   final http.Client _client;
+  final AuthTokenService _authTokenService;
   final String baseUrl;
 
   Future<DictationTranscriptResult> fetchTranscript(String youtubeUrl) async {
@@ -37,16 +43,37 @@ class DictationService {
     );
 
     try {
-      final response = await _client
-          .post(
-            uri,
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'youtubeUrl': trimmedUrl}),
-          )
-          .timeout(const Duration(seconds: 25));
+      final token = await _authTokenService.requireIdToken();
+      var response = await _postTranscript(
+        uri: uri,
+        youtubeUrl: trimmedUrl,
+        token: token,
+      );
+
+      if (response.statusCode == 401) {
+        final freshToken = await _authTokenService.getFreshIdToken();
+        if (freshToken == null || freshToken.trim().isEmpty) {
+          throw Exception(
+            'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+          );
+        }
+        response = await _postTranscript(
+          uri: uri,
+          youtubeUrl: trimmedUrl,
+          token: freshToken,
+        );
+      }
 
       final body = _decodeBody(response.body);
       if (response.statusCode < 200 || response.statusCode >= 300) {
+        if (response.statusCode == 401 || response.statusCode == 403) {
+          throw Exception(
+            'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+          );
+        }
+        if (response.statusCode == 500) {
+          throw Exception('Server error. Please try again later.');
+        }
         throw Exception(
           body['error'] as String? ??
               'Cannot fetch transcript. Please try another video.',
@@ -76,16 +103,31 @@ class DictationService {
         segments: segments,
       );
     } on TimeoutException {
-      throw Exception(
-        'Backend took too long to respond. Please check it is running.',
-      );
+      throw Exception('Cannot connect to backend server.');
     } on SocketException {
-      throw Exception(
-        'Cannot connect to dictation backend. Start the backend and check the base URL.',
-      );
+      throw Exception('Cannot connect to backend server.');
+    } on http.ClientException {
+      throw Exception('Cannot connect to backend server.');
     } on FormatException {
       throw Exception('Backend returned invalid data. Please try again.');
     }
+  }
+
+  Future<http.Response> _postTranscript({
+    required Uri uri,
+    required String youtubeUrl,
+    required String token,
+  }) {
+    return _client
+        .post(
+          uri,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+          body: jsonEncode({'youtubeUrl': youtubeUrl}),
+        )
+        .timeout(const Duration(seconds: 25));
   }
 
   Map<String, dynamic> _decodeBody(String body) {

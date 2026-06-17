@@ -3,14 +3,13 @@ import 'package:provider/provider.dart';
 
 import '../../app/routes.dart';
 import '../../core/widgets/app_card.dart';
-import '../../core/widgets/custom_text_field.dart';
 import '../../core/widgets/empty_state_widget.dart';
 import '../../core/widgets/error_state_widget.dart';
 import '../../core/widgets/loading_widget.dart';
 import '../../core/widgets/main_scaffold.dart';
 import '../../core/widgets/vocabulary_card.dart';
-import '../../models/vocabulary_item.dart';
 import '../../providers/vocabulary_provider.dart';
+import 'widgets/vocabulary_filter_controls.dart';
 import 'widgets/add_vocabulary_dialog.dart';
 import 'widgets/import_csv_dialog.dart';
 
@@ -24,8 +23,6 @@ class MyVocabularyScreen extends StatefulWidget {
 }
 
 class _MyVocabularyScreenState extends State<MyVocabularyScreen> {
-  final _searchController = TextEditingController();
-  String _filter = 'All';
   bool _loaded = false;
 
   @override
@@ -35,26 +32,6 @@ class _MyVocabularyScreenState extends State<MyVocabularyScreen> {
     _loaded = true;
     final vocabulary = context.read<VocabularyProvider>();
     Future.microtask(vocabulary.load);
-  }
-
-  List<VocabularyItem> _filteredItems(List<VocabularyItem> source) {
-    final query = _searchController.text.trim().toLowerCase();
-    var items = source;
-
-    if (_filter == 'Favorites') {
-      items = items.where((item) => item.isFavorite).toList();
-    } else if (_filter == 'Recent') {
-      items = items.take(3).toList();
-    }
-
-    if (query.isEmpty) return items;
-    return items
-        .where(
-          (item) =>
-              item.word.toLowerCase().contains(query) ||
-              item.meaningVi.toLowerCase().contains(query),
-        )
-        .toList();
   }
 
   Future<void> _openAddVocabularyDialog() async {
@@ -87,15 +64,9 @@ class _MyVocabularyScreenState extends State<MyVocabularyScreen> {
   }
 
   @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final vocabulary = context.watch<VocabularyProvider>();
-    final items = _filteredItems(vocabulary.items);
+    final items = vocabulary.filteredVocabulary;
     final hasSavedWords = vocabulary.items.isNotEmpty;
 
     return MainScaffold(
@@ -107,41 +78,14 @@ class _MyVocabularyScreenState extends State<MyVocabularyScreen> {
             padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
             child: Column(
               children: [
-                CustomTextField(
-                  label: 'Search words',
-                  prefixIcon: Icons.search_rounded,
-                  controller: _searchController,
-                  onChanged: (_) => setState(() {}),
-                ),
+                const VocabularyFilterControls(),
                 const SizedBox(height: 14),
                 Row(
                   children: [
-                    Expanded(
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children:
-                              ['All', 'Favorites', 'Recent']
-                                  .map(
-                                    (filter) => Padding(
-                                      padding: const EdgeInsets.only(right: 8),
-                                      child: FilterChip(
-                                        label: Text(filter),
-                                        selected: _filter == filter,
-                                        onSelected:
-                                            (_) => setState(
-                                              () => _filter = filter,
-                                            ),
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
-                        ),
-                      ),
-                    ),
+                    const Spacer(),
                     const SizedBox(width: 12),
                     PopupMenuButton<_AddVocabularyAction>(
-                      tooltip: 'Thêm từ',
+                      tooltip: 'Add word',
                       position: PopupMenuPosition.under,
                       onSelected: _handleAddMenu,
                       itemBuilder:
@@ -150,7 +94,7 @@ class _MyVocabularyScreenState extends State<MyVocabularyScreen> {
                               value: _AddVocabularyAction.manual,
                               child: ListTile(
                                 leading: Icon(Icons.edit_note_rounded),
-                                title: Text('Thêm thủ công'),
+                                title: Text('Add manually'),
                                 contentPadding: EdgeInsets.zero,
                               ),
                             ),
@@ -158,7 +102,7 @@ class _MyVocabularyScreenState extends State<MyVocabularyScreen> {
                               value: _AddVocabularyAction.csv,
                               child: ListTile(
                                 leading: Icon(Icons.upload_file_rounded),
-                                title: Text('Nhập từ CSV'),
+                                title: Text('Import from CSV'),
                                 contentPadding: EdgeInsets.zero,
                               ),
                             ),
@@ -193,13 +137,13 @@ class _MyVocabularyScreenState extends State<MyVocabularyScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Học từ vựng',
+                              'Vocabulary Learning',
                               style: Theme.of(context).textTheme.titleMedium
                                   ?.copyWith(fontWeight: FontWeight.w900),
                             ),
                             const SizedBox(height: 3),
                             Text(
-                              'Bắt đầu học từ các từ đã lưu',
+                              'Start learning from your saved words',
                               style: TextStyle(
                                 color:
                                     Theme.of(
@@ -272,7 +216,7 @@ class _AddWordButton extends StatelessWidget {
           Icon(Icons.add_rounded, color: colors.onPrimary, size: 20),
           const SizedBox(width: 6),
           Text(
-            'Thêm từ',
+            'Add word',
             style: TextStyle(
               color: colors.onPrimary,
               fontWeight: FontWeight.w800,
@@ -302,8 +246,8 @@ class _VocabularyEmptyState extends StatelessWidget {
     }
 
     return const EmptyStateWidget(
-      title: 'No words found',
-      message: 'Try another keyword or switch the filter back to All.',
+      title: 'No vocabulary found',
+      message: 'Try changing your search or filters.',
       icon: Icons.search_off_rounded,
     );
   }

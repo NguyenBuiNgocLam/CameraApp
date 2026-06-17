@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../features/auth/login_screen.dart';
 import '../features/auth/register_screen.dart';
+import '../features/auth/screens/forgot_password_screen.dart';
 import '../features/auth/verify_email_screen.dart';
 import '../features/dictation/screens/dictation_home_screen.dart';
 import '../features/dictation/screens/dictation_practice_screen.dart';
@@ -10,9 +11,15 @@ import '../features/onboarding/onboarding_screen.dart';
 import '../features/profile/profile_screen.dart';
 import '../features/quiz/quiz_result_screen.dart';
 import '../features/quiz/quiz_screen.dart';
+import '../features/review/screens/today_review_screen.dart';
 import '../features/scan/ai_result_screen.dart';
 import '../features/scan/scan_screen.dart';
 import '../features/splash/splash_screen.dart';
+import '../features/system_vocabulary/models/system_vocabulary_set.dart';
+import '../features/system_vocabulary/screens/system_vocabulary_detail_screen.dart';
+import '../features/system_vocabulary/screens/system_vocabulary_learning_result_screen.dart';
+import '../features/system_vocabulary/screens/system_vocabulary_learning_screen.dart';
+import '../features/system_vocabulary/screens/system_vocabulary_sets_screen.dart';
 import '../features/vocabulary/my_vocabulary_screen.dart';
 import '../features/vocabulary/vocabulary_detail_screen.dart';
 import '../features/vocabulary/models/word_list.dart';
@@ -30,6 +37,7 @@ class AppRoutes {
   static const onboarding = '/onboarding';
   static const login = '/login';
   static const register = '/register';
+  static const forgotPassword = '/forgot-password';
   static const verifyEmail = '/verify-email';
   static const home = '/home';
   static const scan = '/scan';
@@ -46,6 +54,12 @@ class AppRoutes {
   static const vocabularyLearning = '/vocabulary-learning';
   static const vocabularyLearningPractice = '/vocabulary-learning-practice';
   static const vocabularyLearningResult = '/vocabulary-learning-result';
+  static const todayReview = '/today-review';
+  static const systemVocabulary = '/system-vocabulary';
+  static const systemVocabularyDetail = '/system-vocabulary-detail';
+  static const systemVocabularyLearning = '/system-vocabulary-learning';
+  static const systemVocabularyLearningResult =
+      '/system-vocabulary-learning-result';
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -57,6 +71,9 @@ class AppRoutes {
         return _route(const LoginScreen());
       case register:
         return _route(const RegisterScreen());
+      case forgotPassword:
+        final initialEmail = settings.arguments as String? ?? '';
+        return _route(ForgotPasswordScreen(initialEmail: initialEmail));
       case verifyEmail:
         return _route(const VerifyEmailScreen());
       case home:
@@ -93,6 +110,19 @@ class AppRoutes {
         return _route(const VocabularyLearningPracticeScreen());
       case vocabularyLearningResult:
         return _route(const VocabularyLearningResultScreen());
+      case todayReview:
+        final autoStart = settings.arguments as bool? ?? false;
+        return _route(TodayReviewScreen(autoStart: autoStart));
+      case systemVocabulary:
+        return _route(const SystemVocabularySetsScreen());
+      case systemVocabularyDetail:
+        final set = settings.arguments as SystemVocabularySet?;
+        if (set == null) return _route(const SystemVocabularySetsScreen());
+        return _route(SystemVocabularyDetailScreen(set: set));
+      case systemVocabularyLearning:
+        return _route(const SystemVocabularyLearningScreen());
+      case systemVocabularyLearningResult:
+        return _route(const SystemVocabularyLearningResultScreen());
       default:
         return _route(const LoginScreen());
     }

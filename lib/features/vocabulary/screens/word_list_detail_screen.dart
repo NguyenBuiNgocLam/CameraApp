@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../app/routes.dart';
+import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/custom_button.dart';
 import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/error_state_widget.dart';
@@ -15,6 +16,7 @@ import '../models/word_list.dart';
 import '../providers/word_list_provider.dart';
 import '../widgets/add_vocabulary_dialog.dart';
 import '../widgets/import_csv_dialog.dart';
+import '../widgets/vocabulary_filter_controls.dart';
 
 class WordListDetailScreen extends StatefulWidget {
   const WordListDetailScreen({required this.list, super.key});
@@ -44,6 +46,7 @@ class _WordListDetailScreenState extends State<WordListDetailScreen> {
       if (!mounted) return;
       context.read<WordListProvider>().selectList(_list);
       context.read<VocabularyProvider>().load();
+      context.read<VocabularyLearningProvider>().loadWordListStats(_list.id);
     });
   }
 
@@ -98,8 +101,8 @@ class _WordListDetailScreenState extends State<WordListDetailScreen> {
       SnackBar(
         content: Text(
           success
-              ? 'Đã cập nhật mục'
-              : provider.errorMessage ?? 'Không thể cập nhật mục',
+              ? 'List updated'
+              : provider.errorMessage ?? 'Could not update list',
         ),
       ),
     );
@@ -110,7 +113,7 @@ class _WordListDetailScreenState extends State<WordListDetailScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Chỉ có thể xóa mục trống. Hãy xóa từ trong mục trước.',
+            'Only empty lists can be deleted. Remove the words first.',
           ),
         ),
       );
@@ -121,12 +124,12 @@ class _WordListDetailScreenState extends State<WordListDetailScreen> {
       context: context,
       builder:
           (context) => AlertDialog(
-            title: const Text('Xóa mục này?'),
-            content: Text('Mục "${_list.name}" đang trống và sẽ bị xóa.'),
+            title: const Text('Delete this list?'),
+            content: Text('List "${_list.name}" is empty and will be deleted.'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text('Hủy'),
+                child: const Text('Cancel'),
               ),
               FilledButton(
                 style: FilledButton.styleFrom(
@@ -134,7 +137,7 @@ class _WordListDetailScreenState extends State<WordListDetailScreen> {
                   foregroundColor: Theme.of(context).colorScheme.onError,
                 ),
                 onPressed: () => Navigator.pop(context, true),
-                child: const Text('Xóa'),
+                child: const Text('Delete'),
               ),
             ],
           ),
@@ -148,7 +151,9 @@ class _WordListDetailScreenState extends State<WordListDetailScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          success ? 'Đã xóa mục' : provider.errorMessage ?? 'Không thể xóa mục',
+          success
+              ? 'List deleted'
+              : provider.errorMessage ?? 'Could not delete list',
         ),
       ),
     );
@@ -162,16 +167,66 @@ class _WordListDetailScreenState extends State<WordListDetailScreen> {
     await provider.startLearning(listId: _list.id);
     if (!mounted) return;
 
-    if (provider.questions.isEmpty) {
+    if (provider.unifiedQuestions.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(provider.errorMessage ?? 'Danh sách này chưa có từ.'),
+          content: Text(provider.errorMessage ?? 'This list has no words yet.'),
         ),
       );
       return;
     }
 
-    Navigator.pushNamed(context, AppRoutes.vocabularyLearningPractice);
+    await Navigator.pushNamed(context, AppRoutes.vocabularyLearningPractice);
+    if (!mounted) return;
+    await context.read<VocabularyProvider>().load();
+    if (!mounted) return;
+    await context.read<VocabularyLearningProvider>().loadWordListStats(
+      _list.id,
+    );
+  }
+
+  Future<void> _startReview() async {
+    final provider = context.read<VocabularyLearningProvider>();
+    await provider.startTodayReview(listId: _list.id);
+    if (!mounted) return;
+
+    if (provider.unifiedQuestions.isEmpty) {
+      await _showNoReviewDialog();
+      return;
+    }
+
+    await Navigator.pushNamed(context, AppRoutes.vocabularyLearningPractice);
+    if (!mounted) return;
+    await context.read<VocabularyProvider>().load();
+    if (!mounted) return;
+    await context.read<VocabularyLearningProvider>().loadWordListStats(
+      _list.id,
+    );
+  }
+
+  Future<void> _showNoReviewDialog() async {
+    await showDialog<void>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('No words to review today'),
+            content: const Text('Come back later or learn new words now.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Back'),
+              ),
+              FilledButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _startLearning();
+                },
+                icon: const Icon(Icons.school_rounded),
+                label: const Text('Learn New Words'),
+              ),
+            ],
+          ),
+    );
   }
 
   void _syncCurrentList() {
@@ -184,7 +239,10 @@ class _WordListDetailScreenState extends State<WordListDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final vocabulary = context.watch<VocabularyProvider>();
-    final items = _itemsForList(vocabulary.items);
+    final learning = context.watch<VocabularyLearningProvider>();
+    final allListItems = _itemsForList(vocabulary.items);
+    final items = vocabulary.filteredVocabularyForList(_list.id);
+    final stats = _WordListLearningStats.fromItems(allListItems);
 
     return MainScaffold(
       currentIndex: 2,
@@ -192,12 +250,12 @@ class _WordListDetailScreenState extends State<WordListDetailScreen> {
         title: Text(_list.name),
         actions: [
           PopupMenuButton<String>(
-            tooltip: 'Tùy chọn mục',
+            tooltip: 'List options',
             onSelected: (value) {
               if (value == 'edit') {
                 _openEditListDialog();
               } else if (value == 'delete') {
-                _deleteList(items);
+                _deleteList(allListItems);
               }
             },
             itemBuilder:
@@ -206,7 +264,7 @@ class _WordListDetailScreenState extends State<WordListDetailScreen> {
                     value: 'edit',
                     child: ListTile(
                       leading: Icon(Icons.edit_rounded),
-                      title: Text('Sửa tên mục'),
+                      title: Text('Edit list name'),
                       contentPadding: EdgeInsets.zero,
                     ),
                   ),
@@ -214,7 +272,7 @@ class _WordListDetailScreenState extends State<WordListDetailScreen> {
                     value: 'delete',
                     child: ListTile(
                       leading: Icon(Icons.delete_outline_rounded),
-                      title: Text('Xóa mục'),
+                      title: Text('Delete list'),
                       contentPadding: EdgeInsets.zero,
                     ),
                   ),
@@ -232,29 +290,53 @@ class _WordListDetailScreenState extends State<WordListDetailScreen> {
                   children: [
                     Expanded(
                       child: CustomButton(
-                        label: 'Học',
+                        label: 'Study',
                         icon: Icons.school_rounded,
+                        isLoading: learning.isLoading,
                         onPressed: _startLearning,
                       ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: CustomButton(
-                        label: 'Thêm từ',
-                        icon: Icons.add_rounded,
+                        label:
+                            stats.dueToday > 0
+                                ? 'Review ${stats.dueToday}'
+                                : 'Review',
+                        icon: Icons.today_rounded,
                         style: CustomButtonStyle.secondary,
-                        onPressed: _openAddVocabularyDialog,
+                        isLoading: learning.isReviewLoading,
+                        onPressed: stats.dueToday == 0 ? null : _startReview,
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 10),
-                CustomButton(
-                  label: 'Nhập CSV',
-                  icon: Icons.upload_file_rounded,
-                  style: CustomButtonStyle.outline,
-                  onPressed: _openImportCsvDialog,
+                _LearningStatsCard(stats: stats),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: CustomButton(
+                        label: 'Add word',
+                        icon: Icons.add_rounded,
+                        style: CustomButtonStyle.secondary,
+                        onPressed: _openAddVocabularyDialog,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: CustomButton(
+                        label: 'Import CSV',
+                        icon: Icons.upload_file_rounded,
+                        style: CustomButtonStyle.outline,
+                        onPressed: _openImportCsvDialog,
+                      ),
+                    ),
+                  ],
                 ),
+                const SizedBox(height: 14),
+                const VocabularyFilterControls(),
               ],
             ),
           ),
@@ -268,11 +350,18 @@ class _WordListDetailScreenState extends State<WordListDetailScreen> {
                       message: vocabulary.errorMessage!,
                       onRetry: context.read<VocabularyProvider>().load,
                     )
+                    : allListItems.isEmpty
+                    ? const EmptyStateWidget(
+                      title: 'This list has no words yet',
+                      message:
+                          'Add words manually or import a CSV to get started.',
+                      icon: Icons.menu_book_rounded,
+                    )
                     : items.isEmpty
                     ? const EmptyStateWidget(
-                      title: 'Danh sách chưa có từ',
-                      message: 'Thêm thủ công hoặc nhập CSV để bắt đầu.',
-                      icon: Icons.menu_book_rounded,
+                      title: 'No vocabulary found',
+                      message: 'Try changing your search or filters.',
+                      icon: Icons.search_off_rounded,
                     )
                     : ListView.separated(
                       padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
@@ -296,6 +385,131 @@ class _WordListDetailScreenState extends State<WordListDetailScreen> {
         ],
       ),
     );
+  }
+}
+
+class _LearningStatsCard extends StatelessWidget {
+  const _LearningStatsCard({required this.stats});
+
+  final _WordListLearningStats stats;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      padding: const EdgeInsets.all(12),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            _StatChip(
+              icon: Icons.school_rounded,
+              label: '${stats.learned}/${stats.total} learned',
+            ),
+            _StatChip(
+              icon: Icons.verified_rounded,
+              label: '${stats.mastered} mastered',
+            ),
+            _StatChip(
+              icon: Icons.psychology_alt_rounded,
+              label: '${stats.temporary} learning',
+            ),
+            _StatChip(
+              icon: Icons.help_outline_rounded,
+              label: '${stats.unknown} unknown',
+            ),
+            _StatChip(
+              icon: Icons.today_rounded,
+              label: '${stats.dueToday} due today',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StatChip extends StatelessWidget {
+  const _StatChip({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(
+          color: colors.primary.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: colors.primary),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: Theme.of(
+                context,
+              ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w800),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _WordListLearningStats {
+  const _WordListLearningStats({
+    required this.total,
+    required this.learned,
+    required this.mastered,
+    required this.temporary,
+    required this.unknown,
+    required this.dueToday,
+  });
+
+  final int total;
+  final int learned;
+  final int mastered;
+  final int temporary;
+  final int unknown;
+  final int dueToday;
+
+  factory _WordListLearningStats.fromItems(List<VocabularyItem> items) {
+    final endOfToday = _endOfToday();
+    return _WordListLearningStats(
+      total: items.length,
+      learned:
+          items
+              .where(
+                (item) => item.hasSeenFlashcard || item.lastReviewedAt != null,
+              )
+              .length,
+      mastered: items.where((item) => item.learningLevel == 'mastered').length,
+      temporary:
+          items.where((item) => item.learningLevel == 'temporary').length,
+      unknown: items.where((item) => item.learningLevel == 'unknown').length,
+      dueToday:
+          items.where((item) {
+            final nextReviewAt = item.nextReviewAt;
+            final learned =
+                item.hasSeenFlashcard || item.lastReviewedAt != null;
+            return learned &&
+                nextReviewAt != null &&
+                !nextReviewAt.isAfter(endOfToday);
+          }).length,
+    );
+  }
+
+  static DateTime _endOfToday() {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day, 23, 59, 59, 999);
   }
 }
 
@@ -331,19 +545,19 @@ class _EditListDialogState extends State<_EditListDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Sửa mục'),
+      title: const Text('Edit list'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           TextField(
             controller: _nameController,
             autofocus: true,
-            decoration: const InputDecoration(labelText: 'Tên mục'),
+            decoration: const InputDecoration(labelText: 'List name'),
           ),
           const SizedBox(height: 10),
           TextField(
             controller: _descriptionController,
-            decoration: const InputDecoration(labelText: 'Ghi chú'),
+            decoration: const InputDecoration(labelText: 'Notes'),
             minLines: 1,
             maxLines: 3,
           ),
@@ -352,7 +566,7 @@ class _EditListDialogState extends State<_EditListDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Hủy'),
+          child: const Text('Cancel'),
         ),
         FilledButton(
           onPressed: () {
@@ -366,7 +580,7 @@ class _EditListDialogState extends State<_EditListDialog> {
               ),
             );
           },
-          child: const Text('Lưu'),
+          child: const Text('Save'),
         ),
       ],
     );

@@ -7,16 +7,20 @@ import '../services/dictation_firestore_service.dart';
 import '../services/dictation_service.dart';
 import '../utils/dictation_text_checker.dart';
 import '../utils/youtube_utils.dart';
+import '../../activity/services/learning_activity_service.dart';
 
 class DictationProvider extends ChangeNotifier {
   DictationProvider({
     required DictationService dictationService,
     required DictationFirestoreService firestoreService,
+    LearningActivityService? activityService,
   }) : _dictationService = dictationService,
-       _firestoreService = firestoreService;
+       _firestoreService = firestoreService,
+       _activityService = activityService ?? LearningActivityService();
 
   final DictationService _dictationService;
   final DictationFirestoreService _firestoreService;
+  final LearningActivityService _activityService;
 
   bool isLoading = false;
   String? errorMessage;
@@ -43,6 +47,7 @@ class DictationProvider extends ChangeNotifier {
   DictationCheckResult? currentCheckResult;
   Map<int, bool> completedSegments = {};
   Map<int, String> userInputs = {};
+  final Set<String> _recordedCompletedSessions = {};
 
   DictationSegment? get currentSegment {
     if (segments.isEmpty) return null;
@@ -409,6 +414,7 @@ class DictationProvider extends ChangeNotifier {
     await saveCurrentProgress();
 
     if (currentIndex >= segments.length - 1) {
+      await _recordDictationCompleted();
       finishPractice();
       return true;
     }
@@ -484,6 +490,24 @@ class DictationProvider extends ChangeNotifier {
     isPlaying = false;
     notifyListeners();
     return true;
+  }
+
+  Future<void> _recordDictationCompleted() async {
+    final uid = _currentUserId();
+    final key =
+        currentSessionId ??
+        videoId ??
+        '${youtubeUrl ?? ''}-${videoTitle ?? ''}-${segments.length}';
+    if (key.trim().isEmpty || _recordedCompletedSessions.contains(key)) {
+      return;
+    }
+
+    try {
+      await _activityService.recordDictationCompleted(uid: uid);
+      _recordedCompletedSessions.add(key);
+    } catch (error) {
+      saveErrorMessage = error.toString().replaceFirst('Exception: ', '');
+    }
   }
 
   void _resetSegmentUi({bool clearCheckMessage = true}) {
